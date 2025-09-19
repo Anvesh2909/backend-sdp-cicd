@@ -3,8 +3,7 @@ package com.springboot.lms;
 import java.io.IOException;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,7 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 @Component
-public class JwtFilter extends OncePerRequestFilter{
+public class JwtFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -35,6 +34,12 @@ public class JwtFilter extends OncePerRequestFilter{
             throws ServletException, IOException {
 
         try {
+            // Skip JWT validation for OPTIONS requests (CORS preflight)
+            if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             String username = null;
             String jwt = null;
 
@@ -54,8 +59,8 @@ public class JwtFilter extends OncePerRequestFilter{
 
                 /* Verify the Token */
                 boolean isValid = jwtUtil.verifyToken(jwt, username);
-                if(isValid) {
-                    /* Authnticate: Set up Authentication - Log this user IN, allow the API access */
+                if (isValid) {
+                    /* Authenticate: Set up Authentication - Log this user IN, allow the API access */
                     UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     usernamePasswordAuthenticationToken
@@ -64,12 +69,10 @@ public class JwtFilter extends OncePerRequestFilter{
                 }
             }
             filterChain.doFilter(request, response);
+        } catch (Exception e) {
+            System.out.println("JWT Filter Error: " + e.getMessage());
+            e.printStackTrace();
+            filterChain.doFilter(request, response); // Continue the chain even on error
         }
-        catch(Exception e) {
-            System.out.println(e);
-        }
-
     }
-
-
 }

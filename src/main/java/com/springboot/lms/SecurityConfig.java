@@ -1,7 +1,5 @@
 package com.springboot.lms;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -25,17 +23,54 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // IMPORTANT: Use setAllowedOriginPatterns instead of setAllowedOrigins for better compatibility
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:5173",
+                "http://184.72.170.131:5173"
+        ));
+
+        // Explicitly allow all necessary methods
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
+
+        // Allow all headers
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+
+        // Allow credentials
+        configuration.setAllowCredentials(true);
+
+        // Set max age for preflight cache
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     SecurityFilterChain filterChain(HttpSecurity http, JwtFilter jwtFilter) throws Exception {
         http
-                .cors(Customizer.withDefaults()) // Add this line
-                .csrf((csrf) -> csrf.disable())
+                // Configure CORS FIRST
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // Disable CSRF
+                .csrf(csrf -> csrf.disable())
+
+                // Configure authorization
                 .authorizeHttpRequests(authorize -> authorize
+                        // Allow ALL OPTIONS requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Public endpoints
                         .requestMatchers("/api/user/signup").permitAll()
                         .requestMatchers("/api/author/register").permitAll()
                         .requestMatchers("/api/learner/add").permitAll()
                         .requestMatchers("/api/author/add").permitAll()
                         .requestMatchers("/api/course/getAll").permitAll()
+
+                        // Authenticated endpoints
                         .requestMatchers("/api/user/token").authenticated()
                         .requestMatchers("/api/user/details").authenticated()
                         .requestMatchers("/api/course/getCoursesByAuthor").hasAuthority("AUTHOR")
@@ -43,28 +78,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/learner/getLearner").hasAuthority("LEARNER")
                         .requestMatchers("/api/video/add/{moduleId}").hasAuthority("AUTHOR")
                         .requestMatchers("/api/course/add").hasAnyAuthority("AUTHOR", "EXECUTIVE")
+
                         .anyRequest().authenticated()
                 )
+
+                // Add JWT filter AFTER CORS is configured
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .httpBasic(Customizer.withDefaults());
+
         return http.build();
-    }
-
-    // Add this bean
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",
-                "http://184.72.170.131:5173"
-        ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
     }
 
     @Bean
@@ -73,8 +95,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    AuthenticationManager getAuthManager(AuthenticationConfiguration auth)
-            throws Exception {
+    AuthenticationManager getAuthManager(AuthenticationConfiguration auth) throws Exception {
         return auth.getAuthenticationManager();
     }
 }

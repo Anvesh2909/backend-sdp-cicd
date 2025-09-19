@@ -26,22 +26,26 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // IMPORTANT: Use setAllowedOriginPatterns instead of setAllowedOrigins for better compatibility
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:5173",
-                "http://184.72.170.131:5173"
-        ));
+        // Be very explicit about allowed origins
+        configuration.addAllowedOrigin("http://184.72.170.131:5173");
+        configuration.addAllowedOrigin("http://localhost:5173");
 
-        // Explicitly allow all necessary methods
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
+        // Allow all methods explicitly
+        configuration.addAllowedMethod("GET");
+        configuration.addAllowedMethod("POST");
+        configuration.addAllowedMethod("PUT");
+        configuration.addAllowedMethod("DELETE");
+        configuration.addAllowedMethod("OPTIONS");
+        configuration.addAllowedMethod("PATCH");
+        configuration.addAllowedMethod("HEAD");
 
         // Allow all headers
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.addAllowedHeader("*");
 
         // Allow credentials
         configuration.setAllowCredentials(true);
 
-        // Set max age for preflight cache
+        // Set max age
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -52,25 +56,15 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, JwtFilter jwtFilter) throws Exception {
         http
-                // Configure CORS FIRST
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // Disable CSRF
                 .csrf(csrf -> csrf.disable())
-
-                // Configure authorization
                 .authorizeHttpRequests(authorize -> authorize
-                        // Allow ALL OPTIONS requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // Public endpoints
                         .requestMatchers("/api/user/signup").permitAll()
                         .requestMatchers("/api/author/register").permitAll()
                         .requestMatchers("/api/learner/add").permitAll()
                         .requestMatchers("/api/author/add").permitAll()
                         .requestMatchers("/api/course/getAll").permitAll()
-
-                        // Authenticated endpoints
                         .requestMatchers("/api/user/token").authenticated()
                         .requestMatchers("/api/user/details").authenticated()
                         .requestMatchers("/api/course/getCoursesByAuthor").hasAuthority("AUTHOR")
@@ -78,11 +72,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/learner/getLearner").hasAuthority("LEARNER")
                         .requestMatchers("/api/video/add/{moduleId}").hasAuthority("AUTHOR")
                         .requestMatchers("/api/course/add").hasAnyAuthority("AUTHOR", "EXECUTIVE")
-
                         .anyRequest().authenticated()
                 )
-
-                // Add JWT filter AFTER CORS is configured
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .httpBasic(Customizer.withDefaults());
 
